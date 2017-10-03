@@ -134,7 +134,7 @@ def tear_down_cleaning(client, task):
 
 def _create_profile_from_template(
         client, server_profile_name,
-        server_hardware_uri, server_profile_template):
+        server_hardware_uri, server_profile_template, deploy_plan_uri):
     """Create a server profile from a server profile template.
 
     :param client: an OneView Client instance
@@ -146,12 +146,22 @@ def _create_profile_from_template(
     :raises HPOneViewException: if the communication with OneView fails
 
     """
+
+    deployment_plan = {
+        "osDeploymentPlanUri": deploy_plan_uri,
+        "osCustomAttributes": [],
+        "osVolumeUri": None
+    }
+
     server_profile = client.server_profile_templates.get_new_profile(
         server_profile_template
     )
     server_profile['name'] = server_profile_name
     server_profile['serverHardwareUri'] = server_hardware_uri
     server_profile['serverProfileTemplateUri'] = ""
+    if deploy_plan_uri:
+        server_profile['osDeploymentSettings'] = deployment_plan
+
     return client.server_profiles.create(server_profile)
 
 
@@ -299,6 +309,7 @@ def allocate_server_hardware_to_ironic(client, node,
     if not node_in_use_by_oneview:
         oneview_info = common.get_oneview_info(node)
         applied_sp_uri = node.driver_info.get('applied_server_profile_uri')
+        deploy_plan_uri = node.driver_info.get('deployment_plan_uri')
         sh_uri = oneview_info.get("server_hardware_uri")
         spt_uri = oneview_info.get("server_profile_template_uri")
         server_hardware = client.server_hardware.get(sh_uri)
@@ -329,7 +340,7 @@ def allocate_server_hardware_to_ironic(client, node,
 
         try:
             applied_profile = _create_profile_from_template(
-                client, server_profile_name, sh_uri, spt_uri
+                client, server_profile_name, sh_uri, spt_uri, deploy_plan_uri
             )
             _add_applied_server_profile_uri_field(node, applied_profile)
 
